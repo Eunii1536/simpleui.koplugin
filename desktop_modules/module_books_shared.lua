@@ -174,8 +174,8 @@ end
 -- ---------------------------------------------------------------------------
 -- getBookCover
 -- ---------------------------------------------------------------------------
-function SH.getBookCover(filepath, w, h)
-    local bb = Config.getCoverBB(filepath, w, h)
+function SH.getBookCover(filepath, w, h, prefetched_bb)
+    local bb = prefetched_bb or Config.getCoverBB(filepath, w, h)
     if not bb then return nil end
     local ok, img = pcall(function()
         return require("ui/widget/imagewidget"):new{

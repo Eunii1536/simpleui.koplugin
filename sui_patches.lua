@@ -29,19 +29,15 @@ local _hs_boot_done = false
 local _hs_pending_after_reader = false
 
 -- Cached result of the "start_with == homescreen_simpleui" setting.
--- nil means stale; invalidated in teardownAll and updated in patchStartWithMenu.
-local _start_with_hs = nil
+-- Caches the result so UIManager.show and UIManager.close (hot paths) avoid
+-- repeated settings lookups on every call. Updated on init and in menu.
+local _start_with_hs = G_reader_settings:readSetting("start_with", "filemanager") == "homescreen_simpleui"
 
 -- Navpager rebuild coalescence flag.
 local _navpager_rebuild_pending = false
 
 -- Returns true when "Start with Homescreen" is the active start_with value.
--- Caches the result so UIManager.show and UIManager.close (hot paths) avoid
--- repeated settings lookups on every call.
 local function isStartWithHS()
-    if _start_with_hs == nil then
-        _start_with_hs = G_reader_settings:readSetting("start_with", "filemanager") == "homescreen_simpleui"
-    end
     return _start_with_hs
 end
 

@@ -103,8 +103,10 @@ function M.build(w, ctx)
     local row = HorizontalGroup:new{ align = "top" }
     for i = 1, cols do
         local fp    = ctx.recent_fps[i]
-        local bd    = SH.getBookData(fp, ctx.prefetched and ctx.prefetched[fp])
-        local cover = SH.getBookCover(fp, cw, ch) or SH.coverPlaceholder(bd.title, cw, ch)
+        local prefetched_entry = ctx.prefetched and ctx.prefetched[fp]
+        local bd    = SH.getBookData(fp, prefetched_entry)
+        local cover = SH.getBookCover(fp, D.RECENT_W, D.RECENT_H, prefetched_entry and prefetched_entry.cover_bb)
+                      or SH.coverPlaceholder(bd.title, D.RECENT_W, D.RECENT_H)
 
         -- Build cover layer: plain or with percentage badge overlaid.
         local cover_widget

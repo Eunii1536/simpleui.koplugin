@@ -989,13 +989,27 @@ function M.getCoverBB(filepath, w, h)
 end
 
 -- Releases all cover bitmaps (owned by us — scaled copies).
+-- Defer the actual freeing of the bitmaps to a background timer to avoid
+-- blocking the UI thread on slower e-readers when closing the Homescreen.
 function M.clearCoverCache()
-    for _, entry in pairs(_bim_cover_cache) do
-        pcall(function() entry.bb:free() end)
-    end
+    if _bim_cover_count == 0 then return end
+    local to_free = _bim_cover_cache
     _bim_cover_cache = {}
     _bim_cover_count = 0
     _RenderImage     = nil
+
+    local UIManager = require("ui/uimanager")
+    -- Free one cover per tick to keep the UI smooth
+    local function freeNext()
+        local k, entry = next(to_free)
+        if not k then return end
+        pcall(function() entry.bb:free() end)
+        to_free[k] = nil
+        if next(to_free) then
+            UIManager:scheduleIn(0.1, freeNext)
+        end
+    end
+    UIManager:scheduleIn(0.1, freeNext)
 end
 
 -- ---------------------------------------------------------------------------
