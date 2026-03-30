@@ -879,7 +879,23 @@ local function _scaleBBToSlot(bb, target_w, target_h)
     local src_w = bb:getWidth()
     local src_h = bb:getHeight()
     if src_w <= 0 or src_h <= 0 then return bb end
-    if src_w == target_w and src_h == target_h then return bb end
+    if src_w == target_w and src_h == target_h then
+        -- MUST copy: bb is typically owned by BookInfoManager. Returning it
+        -- directly means our LRU cache holds a reference to BIM's bitmap.
+        -- When clearCoverCache() frees cached entries, it would destroy BIM's
+        -- internal cover_bb — causing static/noise on the next getCoverBB call
+        -- because the BIM hands back the same (now-freed) FFI memory.
+        local ok_blit, Blitbuffer_mod = pcall(require, "ffi/blitbuffer")
+        if ok_blit and Blitbuffer_mod then
+            local ok_copy, copy_bb = pcall(function()
+                local c = Blitbuffer_mod.new(target_w, target_h, bb:getType())
+                c:blitFrom(bb, 0, 0, 0, 0, target_w, target_h)
+                return c
+            end)
+            if ok_copy and copy_bb then return copy_bb end
+        end
+        return bb  -- fallback if copy fails (rare)
+    end
     -- Use math.max so the image fills the slot completely (cover crop),
     -- rather than math.min which would letterbox/pillarbox with white bars.
     local scale_factor = math.max(target_w / src_w, target_h / src_h)
