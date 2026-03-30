@@ -1050,6 +1050,25 @@ function M.patchUIManagerClose(plugin)
                     -- reader is closing to open a *new* book — do NOT open the HS.
                     if not widget.tearing_down then
                         _hs_pending_after_reader = true
+                        -- Fallback: when returning from the reader, the FM is
+                        -- often already on the UIManager stack — it simply becomes
+                        -- visible when the reader is popped. In that case
+                        -- UIManager.show() is never called for the FM and the flag
+                        -- above is never consumed by patchUIManagerShow.
+                        -- Schedule a deferred check: if the flag is still set by
+                        -- the next event-loop tick, open the HS directly.
+                        UIManager:scheduleIn(0, function()
+                            if not _hs_pending_after_reader then return end
+                            _hs_pending_after_reader = false
+                            if UIManager._exit_code ~= nil then return end
+                            local RUI2 = package.loaded["apps/reader/readerui"]
+                            if RUI2 and RUI2.instance then return end
+                            local HS2 = package.loaded["sui_homescreen"]
+                            if HS2 and HS2._instance then return end
+                            local FM3 = package.loaded["apps/filemanager/filemanager"]
+                            local fm2 = FM3 and FM3.instance
+                            if fm2 then _doShowHS(fm2, plugin) end
+                        end)
                     end
                 else
                     UIManager:scheduleIn(0, function()
