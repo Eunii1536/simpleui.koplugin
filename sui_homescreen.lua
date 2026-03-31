@@ -638,6 +638,7 @@ function HomescreenWidget:_buildContent()
         on_qa_tap    = function(aid) if self_ref._on_qa_tap then self_ref._on_qa_tap(aid) end end,
         on_goal_tap  = function() if self_ref._on_goal_tap then self_ref._on_goal_tap() end end,
         db_conn      = db_conn,
+        db_conn_fatal = false,  -- set to true by any module that gets a fatal DB error
         vspan_pool   = self._vspan_pool,
         prefetched   = bs.prefetched_data,
         current_fp   = bs.current_fp,
@@ -806,6 +807,14 @@ function HomescreenWidget:_buildContent()
 
     -- db_conn is self._db_conn — do NOT close it here.
     -- It is kept alive across renders and closed once in onCloseWidget().
+    -- Exception: if any module signalled a fatal DB error (corrupt / ioerr / notadb),
+    -- drop the connection now so the next render opens a fresh one. This avoids
+    -- every subsequent render failing on a permanently broken connection.
+    if ctx.db_conn_fatal and self._db_conn then
+        logger.warn("simpleui: homescreen: fatal DB error detected — dropping shared connection")
+        pcall(function() self._db_conn:close() end)
+        self._db_conn = nil
+    end
 
     if empty_widget then
         body[#body+1] = empty_widget
@@ -1034,6 +1043,12 @@ function HomescreenWidget:onSuspend()
         UIManager:unschedule(self._clock_timer)
         self._clock_timer = nil
     end
+    -- Cancel the cover poll timer — cover extraction is paused by the OS
+    -- during suspend anyway, so polling serves no purpose.
+    if self._cover_poll_timer then
+        UIManager:unschedule(self._cover_poll_timer)
+        self._cover_poll_timer = nil
+    end
     -- Also cancel the module_clock timer.
     local ClockMod = Registry.get("clock")
     if ClockMod and ClockMod.cancelRefresh then ClockMod.cancelRefresh() end
@@ -1041,16 +1056,11 @@ end
 
 function HomescreenWidget:onResume()
     self._suspended = false
-    -- Invalidate reading stat caches — the device may have been suspended
-    -- during or after a reading session, so stats need refreshing.
-    -- Book metadata (covers, titles) has not changed during suspend, so we
-    -- preserve _cached_books_state by passing keep_cache=true to _refresh,
-    -- avoiding the expensive prefetchBooks() IO (5-6 DocSettings.open calls).
-    local ok_rs, RS = pcall(require, "desktop_modules/module_reading_stats")
-    if ok_rs and RS and RS.invalidateCache then RS.invalidateCache() end
-    local ok_rg, RG = pcall(require, "desktop_modules/module_reading_goals")
-    if ok_rg and RG and RG.invalidateCache then RG.invalidateCache() end
-    -- Rebuild with fresh stats but preserved book cache.
+    -- Cache invalidation is handled by main.lua:onResume, which knows whether
+    -- the user was reading (via _simpleui_reader_was_active snapshot taken at
+    -- suspend time). Invalidating here as well would force expensive SQL queries
+    -- on every wakeup even when nothing changed (plain suspend with no reading).
+    -- We only trigger a UI rebuild and restart timers.
     self:_refresh(true)
     -- Restart the clock timer. _scheduleClockRefresh recalculates the phase
     -- from os.time(), so the clock is always correct after wakeup regardless

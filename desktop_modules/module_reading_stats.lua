@@ -101,13 +101,13 @@ local function fetchAllStats(shared_conn)
         local week_start  = start_today - 6*86400
 
         r.today_secs = tonumber(conn:rowexec(string.format(
-            "SELECT sum(s) FROM (SELECT sum(duration) AS s FROM page_stat WHERE start_time>=%d GROUP BY id_book,page);",
+            "SELECT sum(s) FROM (SELECT sum(duration) AS s FROM page_stat_data WHERE start_time>=%d GROUP BY id_book,page);",
             start_today))) or 0
 
         -- Use '@' as separator — avoids the integer ambiguity of '-'
         -- (page=10, id_book=1 vs page=1, id_book=01 both collapse to "10-1").
         r.today_pages = tonumber(conn:rowexec(string.format(
-            "SELECT count(DISTINCT page||'@'||id_book) FROM page_stat WHERE start_time>=%d AND duration>0;",
+            "SELECT count(DISTINCT page||'@'||id_book) FROM page_stat_data WHERE start_time>=%d AND duration>0;",
             start_today))) or 0
 
         -- Aggregate per-day first (inner GROUP BY dates), then average across days
@@ -121,7 +121,7 @@ local function fetchAllStats(shared_conn)
             FROM (SELECT strftime('%%Y-%%m-%%d',start_time,'unixepoch','localtime') AS dates,
                          sum(duration) AS sd,
                          count(DISTINCT page||'@'||id_book) AS pg
-                  FROM page_stat WHERE start_time>=%d AND duration>0
+                  FROM page_stat_data WHERE start_time>=%d AND duration>0
                   GROUP BY dates);]], week_start))
         if rw and rw[1] and rw[1][1] then
             local nd = tonumber(rw[1][1]) or 0
@@ -130,7 +130,7 @@ local function fetchAllStats(shared_conn)
             if nd > 0 then r.avg_secs=math.floor(tt/nd); r.avg_pages=math.floor(tp/nd) end
         end
 
-        r.total_secs  = tonumber(conn:rowexec("SELECT sum(duration) FROM page_stat;")) or 0
+        r.total_secs  = tonumber(conn:rowexec("SELECT sum(duration) FROM page_stat_data;")) or 0
 
         -- Streak query rewritten to avoid LIMIT inside a CTE — not supported by
         -- the SQLite version bundled in older KOReader builds.
@@ -143,7 +143,7 @@ local function fetchAllStats(shared_conn)
             WITH RECURSIVE
             dated(d) AS (
                 SELECT DISTINCT date(start_time,'unixepoch','localtime')
-                FROM page_stat),
+                FROM page_stat_data),
             streak(d,n) AS (
                 SELECT d, 1 FROM dated
                 WHERE d = (SELECT max(d) FROM dated)
@@ -157,7 +157,11 @@ local function fetchAllStats(shared_conn)
                 ELSE 0 END;]], start_today))
         r.streak = tonumber(streak_val) or 0
     end)
-    if not ok then logger.warn("simpleui: reading_stats: fetchAllStats failed: " .. tostring(err)) end
+    if not ok then logger.warn("simpleui: reading_stats: fetchAllStats failed: " .. tostring(err))
+        if shared_conn and Config.isFatalDbError(err) then
+            r._db_conn_fatal = true
+        end
+    end
     if own_conn then pcall(function() conn:close() end) end
 
     -- Count finished books via sidecar status — uses the shared DocSettings
@@ -382,6 +386,7 @@ function M.build(w, ctx)
 
     local n      = math.min(#stat_ids, RS_N_COLS)
     local stats  = getStats(ctx.db_conn)
+    if stats._db_conn_fatal and ctx then ctx.db_conn_fatal = true end
     local mode   = getType(ctx.pfx)
     local row    = HorizontalGroup:new{ align = "center" }
 

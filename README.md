@@ -105,17 +105,18 @@ SimpleUI has full translation support. The UI language is detected automatically
 | Language | File | Status |
 |---|---|---|
 | English | *(built-in)* | Complete |
-| Português (Portugal) | `locale/pt_PT.po` | Complete (100%) |
-| Português (Brasil) | `locale/pt_BR.po` | Complete (100%) |
-| Polski (Polish) | `locale/pl-PL.po` | Complete (100%) |
-| Türkçe (Turkish) | `locale/tr.po` | Complete (100%) |
-| 简体中文 (Chinese Simplified) | `locale/zh_CN.po` | Partial (97.1% — 10 missing) |
-| 繁體中文 (Chinese Traditional) | `locale/zh_TW.po` | Partial (97.1% — 10 missing) |
-| Français (French) | `locale/fr.po` | Partial (91.3% — 30 missing) |
-| Español | `locale/es.po` | Partial (85.2% — 51 missing) |
-| Русский (Russian) | `locale/ru.po` | Partial (82.3% — 61 missing) |
-| Română (Romanian) | `locale/ro.po` | Partial (70.4% — 102 missing) |
-| Deutsch (German) | `locale/de.po` | Partial (55.1% — 155 missing) |
+| Português (Portugal) | `locale/pt_PT.po` | Partial (98.6% — 5 missing) |
+| Português (Brasil) | `locale/pt_BR.po` | Partial (98.6% — 5 missing) |
+| Türkçe (Turkish) | `locale/tr.po` | Partial (98.6% — 5 missing) |
+| Français (French) | `locale/fr.po` | Partial (97.4% — 9 missing) |
+| 简体中文 (Chinese Simplified) | `locale/zh_CN.po` | Partial (95.7% — 15 missing) |
+| 繁體中文 (Chinese Traditional) | `locale/zh_TW.po` | Partial (95.7% — 15 missing) |
+| Svenska (Swedish) | `locale/sv.po` | Partial (87.8% — 42 missing) |
+| Español | `locale/es.po` | Partial (83.8% — 56 missing) |
+| Русский (Russian) | `locale/ru.po` | Partial (80.9% — 66 missing) |
+| Română (Romanian) | `locale/ro.po` | Partial (78.3% — 75 missing) |
+| Polski (Polish) | `locale/pl.po` | Partial (71.0% — 100 missing) |
+| Deutsch (German) | `locale/de.po` | Partial (56.5% — 150 missing) |
 
 ### Adding a new language
 

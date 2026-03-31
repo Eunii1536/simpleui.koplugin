@@ -50,7 +50,16 @@ local _CLR_BAR_FG = Blitbuffer.gray(0.75)
 local _BASE_COVER_GAP  = Screen:scaleBySize(12)  -- between cover and text column
 local _BASE_TITLE_GAP  = Screen:scaleBySize(4)   -- before title
 local _BASE_AUTHOR_GAP = Screen:scaleBySize(8)   -- before author
-local _BASE_BAR_GAP    = Screen:scaleBySize(6)   -- before progress bar
+-- Vertical gaps around the progress bar.
+-- The bar (LineWidget) has no internal padding — it starts and ends at exact pixels.
+-- TextWidget includes ascender/descender space inside its reported height, which
+-- the eye reads as part of the gap. To look balanced:
+--   before the bar: slightly smaller because the author text's descender space
+--                   adds ~2px of visual gap "for free" from inside the widget.
+--   after the bar:  larger to compensate for the ascender space of the next text
+--                   being consumed from the gap, making it look narrower.
+local _BASE_BAR_GAP_BEFORE = Screen:scaleBySize(6)   -- gap above the progress bar
+local _BASE_BAR_GAP_AFTER  = Screen:scaleBySize(10)  -- gap below the progress bar
 local _BASE_PCT_GAP    = Screen:scaleBySize(3)   -- before percent / stats rows
 
 -- Progress bar dimensions
@@ -93,8 +102,9 @@ local _bstats_cache = {}
 
 
 -- Builds a progress bar with an inline percentage label: [▓▓▓░░░░] XX%
--- bar_gap_w is applied as padding_bottom so the caller controls the gap below.
-local function buildProgressBarWithPct(w, pct, bar_h, bar_gap_w, scale, lbl_scale, face_inline)
+-- Spacing below the bar is handled by gap_before() on the next element,
+-- consistent with how every other element in the layout works.
+local function buildProgressBarWithPct(w, pct, bar_h, scale, lbl_scale, face_inline)
     local PCT_W   = math.max(16, math.floor(_BASE_PCT_W       * scale * lbl_scale))
     local GAP     = math.max(2,  math.floor(_BASE_BAR_PCT_GAP * scale))
     local bar_w   = math.max(10, w - GAP - PCT_W)
@@ -114,7 +124,7 @@ local function buildProgressBarWithPct(w, pct, bar_h, bar_gap_w, scale, lbl_scal
         }
     end
 
-    local row = HorizontalGroup:new{
+    return HorizontalGroup:new{
         align = "center",
         bar,
         HorizontalSpan:new{ width = GAP },
@@ -125,13 +135,6 @@ local function buildProgressBarWithPct(w, pct, bar_h, bar_gap_w, scale, lbl_scal
             fgcolor = _CLR_DARK,
             width   = PCT_W,
         },
-    }
-
-    return FrameContainer:new{
-        bordersize     = 0,
-        padding        = 0,
-        padding_bottom = bar_gap_w,
-        row,
     }
 end
 
@@ -170,7 +173,9 @@ end
 -- Cache is cleared by invalidateCache() (called from onCloseDocument) before
 -- each post-reading rebuild, so data is always fresh when it matters.
 -- Uses shared_conn when available to avoid opening a second DB connection.
-local function fetchBookStats(md5, shared_conn)
+-- ctx is optional: when provided and a fatal DB error occurs on the shared_conn,
+-- ctx.db_conn_fatal is set to true so the homescreen can discard the connection.
+local function fetchBookStats(md5, shared_conn, ctx)
     if not md5 then return nil end
 
     if _bstats_cache[md5] then
@@ -183,10 +188,12 @@ local function fetchBookStats(md5, shared_conn)
 
     local result = nil
     local ok, err = pcall(function()
-        -- Single-pass CTE: resolves book id once, then one GROUP BY scan.
         -- ps_agg accumulates per-page totals; the outer SELECT aggregates them.
         -- sum(page_dur) replaces a correlated subquery that caused a second
-        -- full scan of page_stat on every call.
+        -- full scan of page_stat_data on every call.
+        -- Uses page_stat_data directly instead of the page_stat VIEW, which
+        -- cross-joins with a numbers table for page rescaling and is
+        -- catastrophically slow (10s+ for books with a few hundred rows).
         -- Relies on idx_simpleui_book_md5 / idx_simpleui_pagestat_book indexes
         -- created by openStatsDB() for O(log n) lookup instead of full-table scan.
         local row = conn:exec(string.format([[
@@ -197,7 +204,7 @@ local function fetchBookStats(md5, shared_conn)
                 SELECT ps.page,
                        sum(ps.duration)   AS page_dur,
                        min(ps.start_time) AS first_start
-                FROM page_stat ps
+                FROM page_stat_data ps
                 WHERE ps.id_book = (SELECT id FROM b)
                 GROUP BY ps.page
             )
@@ -223,6 +230,11 @@ local function fetchBookStats(md5, shared_conn)
     end)
     if not ok then
         logger.warn("simpleui: module_currently: fetchBookStats failed: " .. tostring(err))
+        -- Signal to the homescreen that the shared connection is unusable so it
+        -- can be discarded and reopened on the next render.
+        if shared_conn and ctx and Config.isFatalDbError(err) then
+            ctx.db_conn_fatal = true
+        end
     end
     if own_conn then pcall(function() conn:close() end) end
     if result then _bstats_cache[md5] = result end
@@ -308,12 +320,13 @@ function M.build(w, ctx)
     local D           = SH.getDims(scale, thumb_scale)
 
     -- Scale gaps (layout scale only).
-    local cover_gap  = math.max(1, math.floor(_BASE_COVER_GAP  * scale))
-    local title_gap  = math.max(1, math.floor(_BASE_TITLE_GAP  * scale))
-    local author_gap = math.max(1, math.floor(_BASE_AUTHOR_GAP * scale))
-    local bar_gap    = math.max(1, math.floor(_BASE_BAR_GAP    * scale))
-    local pct_gap    = math.max(1, math.floor(_BASE_PCT_GAP    * scale))
-    local bar_h      = math.max(1, math.floor(_BASE_BAR_H      * scale))
+    local cover_gap      = math.max(1, math.floor(_BASE_COVER_GAP      * scale))
+    local title_gap      = math.max(1, math.floor(_BASE_TITLE_GAP      * scale))
+    local author_gap     = math.max(1, math.floor(_BASE_AUTHOR_GAP     * scale))
+    local bar_gap_before = math.max(1, math.floor(_BASE_BAR_GAP_BEFORE * scale))
+    local bar_gap_after  = math.max(1, math.floor(_BASE_BAR_GAP_AFTER  * scale))
+    local pct_gap        = math.max(1, math.floor(_BASE_PCT_GAP        * scale))
+    local bar_h          = math.max(1, math.floor(_BASE_BAR_H          * scale))
 
     -- Scale font sizes (layout scale × text scale).
     local title_fs   = math.max(8, math.floor(_BASE_TITLE_FS   * scale * lbl_scale))
@@ -355,7 +368,7 @@ function M.build(w, ctx)
     local bstats
     if show.days or show.time or show.remain then
         local book_md5 = prefetched_entry and prefetched_entry.partial_md5_checksum
-        bstats = fetchBookStats(book_md5, ctx.db_conn)
+        bstats = fetchBookStats(book_md5, ctx.db_conn, ctx)
     end
 
     local bar_style   = getBarStyle(pfx)
@@ -373,11 +386,15 @@ function M.build(w, ctx)
     local _compact_stats_rendered = false
 
     -- Adds a vertical gap before the next element, but not before the first one.
+    -- _next_gap overrides the default size for exactly one call (used after the
+    -- progress bar, where bar_gap_after compensates for font metric asymmetry).
     local meta_has_content = false
+    local _next_gap        = nil
     local function gap_before(size)
         if meta_has_content then
-            meta[#meta+1] = VerticalSpan:new{ width = size }
+            meta[#meta+1] = VerticalSpan:new{ width = _next_gap or size }
         end
+        _next_gap = nil
     end
 
     -- Append each visible element to meta in user-configured order.
@@ -404,13 +421,14 @@ function M.build(w, ctx)
             meta_has_content = true
 
         elseif elem == "progress" and show.progress then
-            gap_before(bar_gap)
+            gap_before(bar_gap_before)
             if bar_style == "with_pct" then
-                meta[#meta+1] = buildProgressBarWithPct(tw, bd.percent, bar_h, bar_gap, scale, lbl_scale, face_inlinepct)
+                meta[#meta+1] = buildProgressBarWithPct(tw, bd.percent, bar_h, scale, lbl_scale, face_inlinepct)
             else
                 meta[#meta+1] = SH.progressBar(tw, bd.percent, bar_h)
             end
             meta_has_content = true
+            _next_gap = bar_gap_after  -- next element uses the larger post-bar gap
 
         elseif elem == "percent" and show.percent and bar_style ~= "with_pct" then
             gap_before(pct_gap)

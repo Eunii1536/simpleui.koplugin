@@ -116,6 +116,7 @@ local function getGoalStats(shared_conn)
     end
 
     local year_secs, today_secs = 0, 0
+    local fatal = false
     local conn = shared_conn or Config.openStatsDB()
     if conn then
         local own_conn = not shared_conn
@@ -138,14 +139,17 @@ local function getGoalStats(shared_conn)
                 stmt:reset()
             end
         end)
-        if not ok then logger.warn("simpleui: reading_goals: getGoalStats failed: " .. tostring(err)) end
+        if not ok then
+            logger.warn("simpleui: reading_goals: getGoalStats failed: " .. tostring(err))
+            if shared_conn and Config.isFatalDbError(err) then fatal = true end
+        end
         if own_conn then pcall(function() conn:close() end) end
     end
 
     local books_read = _countMarkedRead(os.date("%Y"))
     _stats_cache     = { books_read, year_secs, today_secs }
     _stats_cache_day = today_key
-    return books_read, year_secs, today_secs
+    return books_read, year_secs, today_secs, fatal
 end
 
 -- Computes all layout metrics for the default layout at the given scale factor.
@@ -489,7 +493,8 @@ function M.build(w, ctx)
     if not show_ann and not show_day then return nil end
 
     local inner_w = w - PAD * 2
-    local books_read, year_secs, today_secs = getGoalStats(ctx.db_conn)
+    local books_read, year_secs, today_secs, _rg_fatal = getGoalStats(ctx.db_conn)
+    if _rg_fatal and ctx then ctx.db_conn_fatal = true end
     local rows = VerticalGroup:new{ align = "left" }
 
     if isCompact() then
