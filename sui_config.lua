@@ -1035,7 +1035,7 @@ end
 -- ---------------------------------------------------------------------------
 
 local _ROUNDED_COVERS_KEY    = "simpleui_rounded_covers"
-local _ROUNDED_COVERS_RADIUS = require("device").screen:scaleBySize(6)
+local _ROUNDED_COVERS_RADIUS = require("device").screen:scaleBySize(12)
 
 function M.getRoundedCovers()
     return G_reader_settings:isTrue(_ROUNDED_COVERS_KEY)
