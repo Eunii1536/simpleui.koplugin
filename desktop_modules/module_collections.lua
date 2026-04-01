@@ -179,6 +179,7 @@ local function buildCoverCell(files, cover_override, coll_name, count, d)
             cover = FrameContainer:new{
                 bordersize = 1, color = _CLR_COVER_BORDER,
                 padding    = 0, margin = 0,
+                radius     = Config.getCoverRadius(),
                 dimen      = Geom:new{ w = d.coll_w, h = d.coll_h },
                 raw,
             }
@@ -188,6 +189,7 @@ local function buildCoverCell(files, cover_override, coll_name, count, d)
         cover = FrameContainer:new{
             bordersize = 1, color = _CLR_COVER_BORDER,
             background = _CLR_COVER_BG, padding = 0,
+            radius     = Config.getCoverRadius(),
             dimen      = Geom:new{ w = d.coll_w, h = d.coll_h },
             CenterContainer:new{
                 dimen = Geom:new{ w = d.coll_w, h = d.coll_h },

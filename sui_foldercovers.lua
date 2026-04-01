@@ -725,7 +725,8 @@ function M.install()
 
         local image        = ImageWidget:new(img_options)
         local size         = image:getSize()
-        local image_widget = FrameContainer:new{ padding = 0, bordersize = border, image }
+        local _cover_r = require("sui_config").getCoverRadius()
+        local image_widget = FrameContainer:new{ padding = 0, bordersize = border, radius = _cover_r, image }
 
         local spine       = _buildSpine(size.h)
         local cover_group = HorizontalGroup:new{ align = "center", spine, image_widget }

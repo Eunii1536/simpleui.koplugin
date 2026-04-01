@@ -1029,6 +1029,31 @@ function M.clearCoverCache()
 end
 
 -- ---------------------------------------------------------------------------
+-- Rounded covers — optional rounded corners on book cover thumbnails.
+-- Setting key: "simpleui_rounded_covers" (boolean, default false).
+-- When enabled, all FrameContainers wrapping book covers receive a radius.
+-- ---------------------------------------------------------------------------
+
+local _ROUNDED_COVERS_KEY    = "simpleui_rounded_covers"
+local _ROUNDED_COVERS_RADIUS = require("device").screen:scaleBySize(6)
+
+function M.getRoundedCovers()
+    return G_reader_settings:isTrue(_ROUNDED_COVERS_KEY)
+end
+
+function M.setRoundedCovers(on)
+    G_reader_settings:saveSetting(_ROUNDED_COVERS_KEY, on)
+end
+
+-- Returns the radius value to use, or 0 when disabled.
+function M.getCoverRadius()
+    if M.getRoundedCovers() then
+        return _ROUNDED_COVERS_RADIUS
+    end
+    return 0
+end
+
+-- ---------------------------------------------------------------------------
 -- Topbar config cache — shared between topbar.lua and menu.lua so that
 -- checked_func callbacks don't rebuild the config table on every render (#16).
 -- Invalidated automatically by saveTopbarConfig().

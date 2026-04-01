@@ -1740,6 +1740,17 @@ SimpleUIPlugin.addToMainMenu = function(self, menu_items)
                                         keep_menu_open = true,
                                         callback       = function() FC.setHideUnderline(not FC.getHideUnderline()); _refreshFC() end,
                                     },
+                                    {
+                                        text           = _("Rounded covers"),
+                                        checked_func   = function() return Config.getRoundedCovers() end,
+                                        keep_menu_open = true,
+                                        callback       = function()
+                                            Config.setRoundedCovers(not Config.getRoundedCovers())
+                                            Config.clearCoverCache()
+                                            _refreshFC()
+                                            plugin:_scheduleRebuild()
+                                        end,
+                                    },
                                 }
                             end,
                         },

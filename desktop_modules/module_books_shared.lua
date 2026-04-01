@@ -159,6 +159,7 @@ function SH.coverPlaceholder(title, w, h)
     return FrameContainer:new{
         bordersize = 1, color = _CLR_COVER_BORDER,
         background = _CLR_COVER_BG, padding = 0,
+        radius     = Config.getCoverRadius(),
         dimen      = Geom:new{ w = w, h = h },
         require("ui/widget/container/centercontainer"):new{
             dimen = Geom:new{ w = w, h = h },
@@ -190,6 +191,7 @@ function SH.getBookCover(filepath, w, h, prefetched_bb)
     return FrameContainer:new{
         bordersize = 1, color = _CLR_COVER_BORDER,
         padding    = 0, margin = 0,
+        radius     = Config.getCoverRadius(),
         dimen      = Geom:new{ w = w, h = h },
         img,
     }
