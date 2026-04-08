@@ -154,10 +154,11 @@ local function getBookCover(filepath, w, h)
     if not bb then return nil end
     local ok, img = pcall(function()
         return ImageWidget:new{
-            image        = bb,
-            width        = w,
-            height       = h,
-            scale_factor = 1,
+            image            = bb,
+            image_disposable = false,  -- bb is owned by the cover cache; must not be freed here
+            width            = w,
+            height           = h,
+            scale_factor     = 1,
         }
     end)
     return ok and img or nil
@@ -309,6 +310,7 @@ function M.getCountLabel(_pfx)
 end
 
 function M.build(w, ctx)
+    Config.applyLabelToggle(M, _("Collections"))
     local scale       = Config.getModuleScale("collections", ctx.pfx)
     local thumb_scale = Config.getThumbScale("collections", ctx.pfx)
     local lbl_scale   = Config.getItemLabelScale("collections", ctx.pfx)
@@ -533,6 +535,7 @@ function M.getMenuItems(ctx_menu)
     end
 
     local items = {}
+    items[#items + 1] = Config.makeLabelToggleItem("collections", _("Collections"), refresh, _lc)
     items[#items + 1] = {
         text = _lc("Arrange Collections"), keep_menu_open = true,
         callback = function()
